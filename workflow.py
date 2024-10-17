@@ -7,6 +7,9 @@ import datetime
 import psutil
 import webbrowser
 from ai_models.img_ai import *
+import json
+import requests
+import base64
 
 web_cam = cv2.VideoCapture(0)
 
@@ -14,7 +17,7 @@ def take_screenshot():
     path = 'screenshot.jpg'
     screenshot = ImageGrab.grab()
     rgb_screenshot = screenshot.convert('RGB')
-    rgb_screenshot.save(path, quality=60)
+    rgb_screenshot.save(path, quality=100)
 
 def webcam_capture():
     if not web_cam.isOpened():
@@ -78,30 +81,68 @@ def wish_me():
 
 def open_website_default(url):
     """Opens a website in the default web browser."""
-    webbrowser.open_new(url)
-
-def open_website_in_browser(browser_name, url):
-    """Opens a website in a specified web browser."""
     try:
-        # Define paths to custom browsers if necessary
-        browser_paths = {
-            'brave': "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
-            'arc': '/path/to/arc-browser'       # Change this to the correct path
-        }
-        
-        # Register the browser if it's a custom one
-        if browser_name in browser_paths:
-            webbrowser.register(browser_name, None, webbrowser.BackgroundBrowser(browser_paths[browser_name]))
-        
-        # Get the browser controller and open the URL
-        webbrowser.get(browser_name).open(url)
-    except webbrowser.Error as e:
-        print(f"An error occurred: {e}")
+        webbrowser.open(url)
+        return 'done'
+    except Exception as e:
+        print(e)
+        return False
 
-def reply_screenshot(prompt: str) -> str:
-    # try:
-    #     response = img_processor_gemini(prompt=prompt, path='screenshot.jpg')
-    # except:
-    response = img_processor_llava(prompt=prompt, path='screenshot.jpg')
-    tool_history = []
+def encode_image_to_base64(image_path):
+    with open(image_path, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+    return encoded_string
 
+def vision_brain(encoded_image, prompt):
+    url = "https://api.deepinfra.com/v1/openai/chat/completions"
+
+    headers = {
+        "accept": "text/event-stream",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0",
+        "x-deepinfra-source": "model-embed"
+    }
+
+    payload = {
+        "model": "llava-hf/llava-1.5-7b-hf",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{encoded_image}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+
+    # Convert the payload to JSON
+    payload_json = json.dumps(payload)
+
+    # Make the POST request
+    response = requests.post(url, headers=headers, data=payload_json)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        response_str = response.content.decode('utf-8')
+        data = json.loads(response_str)
+        answer = data['choices'][0]['message']['content']
+        return answer
+    else:
+        print(f"Error: API request failed with status code {response.status_code}")
+        return None
+
+def is_Online(url = "https://www.google.com",timeout=5):
+    try:
+        response = requests.get(url,timeout=timeout)
+        if response.status_code >= 200 and response.status_code<300:
+            return True
+    except requests.ConnectionError:
+        return False

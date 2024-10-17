@@ -1,24 +1,48 @@
-import pyttsx3
-from colorama import Fore
+import requests # pip install requests
+from playsound import playsound # pip install playsound==1.2.2
+import os
+from typing import Union # pip install typing
+import sys
+import time
+import threading
 
-def speak_text(text: str, voice_id: str = 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_EN-US_DAVID_11.0'):
-    """
-    Convert the input text to speech using the specified voice ID.
+def generate_audio(message: str,voice : str = "Matthew"):
+    url: str = f"https://api.streamelements.com/kappa/v2/speech?voice={voice}&text={{{message}}}"
+
+    headers = {'User-Agent':'Mozilla/5.0(Maciontosh;intel Mac OS X 10_15_7)AppleWebKit/537.36(KHTML,like Gecoko)Chrome/119.0.0.0 Safari/537.36'}
     
-    :param text: The text to be spoken.
-    :param voice_id: The ID of the voice to be used (default is DAVID voice).
-    """
-    # Initialize the text-to-speech engine
-    engine = pyttsx3.init()
+    try:
+        result = requests.get(url=url, headers=headers)
+        return result.content
+    except:
+        return None
+    
+def print_animated_message(message):
+    for char in message:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(0.050)  # Adjust the sleep duration for the animation speed
+    print()
 
-    # Set the voice using the voice ID
-    engine.setProperty('voice', voice_id)
+def Co_speak(message: str, voice: str = "Matthew", folder: str = "", extension: str = ".mp3") -> Union[None,str]:
+    try:
+        result_content = generate_audio(message,voice)
+        file_path = os.path.join(folder,f"{voice}{extension}")
+        with open(file_path,"wb") as file:
+            file.write(result_content)
+        playsound(file_path)
+        os.remove(file_path)
+        return None
+    except Exception as e:
+        print(e)
 
-    # Print the text first
-    print(f'{Fore.GREEN}Jarvis: {text}')
+def speak(text):
+    t1 = threading.Thread(target=Co_speak,args=(text,))
+    t2 = threading.Thread(target=print_animated_message,args=(text,))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
 
-    # Speak the text
-    engine.say(text)
-    engine.runAndWait()
-
-
+if __name__ == "__main__":
+    speak("Hello sir")
